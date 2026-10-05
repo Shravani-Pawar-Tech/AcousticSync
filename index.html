@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Air-Gap Acoustic Data Transfer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>Air-Gap Acoustic Engine</h1>
+    <p>Data-Over-Sound • 15–20 kHz Ultrasound Band</p>
+    <!-- UPGRADE: persistent peer id, visible before/after starting -->
+    <span class="peer-badge" id="peerIdBadge">Peer: ----</span>
+  </header>
+
+  <!-- Status & Initialization Button -->
+  <div class="status-card">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">System Offline</span>
+    </div>
+    <button class="btn" id="startBtn">Initialize Engine</button>
+  </div>
+
+  <!-- UPGRADE: calibration progress bar, hidden until Start is pressed -->
+  <div class="status-card calibrate-bar" id="calibrateBar" style="display:none;">
+    <span id="calibrateLabel" style="font-size:0.75rem;color:var(--text-muted);">Sampling ambient noise (1.5s)...</span>
+    <div class="calibrate-track">
+      <div class="calibrate-fill" id="calibrateFill"></div>
+    </div>
+  </div>
+
+  <!-- Manual ultrasonic/audible fallback toggle -->
+  <div class="status-card">
+    <span style="font-size:0.75rem;color:var(--text-muted);">Transmission mode</span>
+    <button class="btn" id="fallbackToggle">Mode: Ultrasonic (tap for Audible)</button>
+  </div>
+
+  <!-- Spectrogram Display -->
+  <div class="panel">
+    <div class="panel-title">
+      <span>15–20 kHz Spectrogram</span>
+      <span class="badge">Ultrasound Monitor</span>
+    </div>
+    <canvas id="spectrogramCanvas"></canvas>
+  </div>
+
+  <!-- Proximity Radar Display -->
+  <div class="panel">
+    <div class="panel-title">Acoustic Proximity Radar</div>
+    <div class="radar-wrapper">
+      <canvas id="radarCanvas" width="200" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Messenger Display -->
+  <div class="panel">
+    <div class="panel-title">Acoustic Messenger</div>
+    <div class="input-group">
+      <input type="text" id="msgInput" placeholder="Type offline message..." disabled>
+      <button class="btn" id="sendBtn" disabled>Transmit</button>
+    </div>
+  </div>
+
+  <!-- Terminal Output -->
+  <div class="panel">
+    <div class="panel-title">Terminal Log</div>
+    <div class="logs-container" id="logs">
+      <div class="log-item log-sys">[SYS] Awaiting engine initialization...</div>
+    </div>
+  </div>
+
+  <!-- Local Offline Scripts (No Internet Required) -->
+  <script src="ggwave.js"></script>
+  <!-- UPGRADE: new isolated modules, loaded before audioEngine.js / app.js
+       because both depend on them -->
+  <script src="frameProtocol.js"></script>
+  <script src="csma.js"></script>
+  <script src="noiseCalibration.js"></script>
+  <script src="storage.js"></script>
+  <script src="audioEngine.js"></script>
+  <script src="spectrogram.js"></script>
+  <script src="radar.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!--
+  test.html — bare-bones acoustic link validator.
+  Purpose: prove sound-over-air data transfer works on YOUR real phones
+  before you touch the full UI. Nothing else in this file matters.
+
+  HOW TO USE:
+  1. Put this file in the same folder as ggwave.js.
+  2. Serve the folder (see instructions in chat) and open on TWO phones.
+  3. On phone A: tap "Send Test Ping" (ultrasonic).
+  4. On phone B: watch the "Received" box. If nothing appears within a
+     few seconds, tap "Switch to Audible" on BOTH phones and try again.
+  5. Do this 10 times, note how many arrived. That success rate is your
+     real answer to "will this work," not a guess.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Acoustic Link Test</title>
+<style>
+  body { font-family: monospace; background:#0d1117; color:#d7e4ee; padding:20px; }
+  button { display:block; width:100%; padding:16px; margin:10px 0; font-size:16px;
+           background:#00f3ff; color:#000; border:none; border-radius:8px; }
+  #log { background:#000; padding:10px; border-radius:6px; min-height:120px;
+         white-space:pre-wrap; font-size:13px; }
+  #status { color:#7b8fa3; margin-bottom:10px; }
+</style>
+</head>
+<body>
+  <h2>Acoustic Link Test</h2>
+  <div id="status">Not started</div>
+
+  <button id="initBtn">1. Start Mic + Engine</button>
+  <button id="sendUltra" disabled>2. Send Test Ping (Ultrasonic)</button>
+  <button id="sendAudible" disabled>2b. Send Test Ping (Audible fallback)</button>
+
+  <div id="log">Received messages will appear here...</div>
+
+  <script src="ggwave.js"></script>
+  <script>
+    let audioCtx, ggwave, instance, analyser, processorNode;
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+
+    function logLine(text) {
+      logEl.textContent = `[${new Date().toLocaleTimeString()}] ${text}\n` + logEl.textContent;
+    }
+
+    // byte-reinterpret helper required by ggwave (not a numeric cast)
+    function convertTypedArray(src, type) {
+      const buffer = new ArrayBuffer(src.byteLength);
+      new src.constructor(buffer).set(src);
+      return new type(buffer);
+    }
+
+    document.getElementById('initBtn').addEventListener('click', async () => {
+      statusEl.textContent = 'Requesting mic access...';
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+
+      const source = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+
+      ggwave = await ggwave_factory();
+      const params = ggwave.getDefaultParameters();
+      params.sampleRateInp = audioCtx.sampleRate;
+      params.sampleRateOut = audioCtx.sampleRate;
+      instance = ggwave.init(params);
+
+      // Continuous decode loop — see full explanation in the fixed
+      // audioEngine.js this test page mirrors.
+      processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
+      analyser.connect(processorNode);
+      const silentSink = audioCtx.createGain();
+      silentSink.gain.value = 0;
+      processorNode.connect(silentSink);
+      silentSink.connect(audioCtx.destination);
+
+      processorNode.onaudioprocess = (e) => {
+        const samples = e.inputBuffer.getChannelData(0);
+        const res = ggwave.decode(instance, convertTypedArray(new Float32Array(samples), Int8Array));
+        if (res && res.length > 0) {
+          const text = new TextDecoder("utf-8").decode(res);
+          logLine(`RECEIVED: "${text}"`);
+        }
+      };
+
+      statusEl.textContent = 'Engine live — listening...';
+      document.getElementById('sendUltra').disabled = false;
+      document.getElementById('sendAudible').disabled = false;
+    });
+
+    function sendTest(protocolName) {
+      const protocol = ggwave.ProtocolId[protocolName];
+      const waveformInt8 = ggwave.encode(instance, "hello-" + Math.floor(Math.random()*1000), protocol, 15);
+      const waveform = convertTypedArray(waveformInt8, Float32Array);
+
+      const buf = audioCtx.createBuffer(1, waveform.length, audioCtx.sampleRate);
+      buf.getChannelData(0).set(waveform);
+
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start();
+
+      logLine(`SENT via ${protocolName}`);
+    }
+
+    document.getElementById('sendUltra').addEventListener('click', () => sendTest('GGWAVE_PROTOCOL_ULTRASOUND_FAST'));
+    document.getElementById('sendAudible').addEventListener('click', () => sendTest('GGWAVE_PROTOCOL_AUDIBLE_FAST'));
+  </script>
+</body>
+</html>
